@@ -43,4 +43,39 @@ CHIP ALU {
 
     PARTS:
    // Put you code here:
+    // if (zx == 1) set x = 0        // 16-bit constant
+    Mux16(a=x, b=false, sel=zx, out=tx);
+    // if (nx == 1) set x = !x       // bitwise not
+    Not16(in=tx, out=ntx);
+    Mux16(a=tx, b=ntx, sel=nx, out=ox);
+
+    // if (zy == 1) set y = 0        // 16-bit constant
+    Mux16(a=y, b=false, sel=zy, out=ty);
+    // if (ny == 1) set y = !y       // bitwise not
+    Not16(in=ty, out=nty);
+    Mux16(a=ty, b=nty, sel=ny, out=oy);
+
+    // if (f == 1)  set out = x + y  // integer 2's complement addition
+    // if (f == 0)  set out = x & y  // bitwise and
+    Add16(a=ox, b=oy, out=xAddy);
+    And16(a=ox, b=oy, out=xAndy);
+    Mux16(a=xAndy, b=xAddy, sel=f, out=xAy);
+
+    // if (no == 1) set out = !out   // bitwise not
+    Not16(in=xAy, out=notxAy);
+    Mux16(a=xAy, b=notxAy, sel=no, out=tout);
+    
+    // create the narrower bus as an output from a chip-part
+    And16(a=tout, b=true, out[0..7]=lout, out[8..15]=hout, out[15]=lstout);
+
+    // if (out == 0) set zr = 1
+    Or8Way(in=lout, out=lzr);
+    Or8Way(in=hout, out=hzr);
+    Or(a=lzr, b=hzr, out=tzr);
+    Not(in=tzr, out=zr);
+
+    // if (out < 0) set ng = 1
+    Mux(a=false, b=true, sel=lstout, out=ng);
+
+    And16(a=tout, b=true, out=out);
 }
