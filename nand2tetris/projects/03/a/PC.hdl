@@ -17,4 +17,12 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
+    Register(in=outt, load=true, out=outt1);
+    And16(a=outt1, b=true, out=out);
+
+    Inc16(in=outt1, out=outt2);
+
+    And16(a[0]=inc, a[1]=load, a[2]=reset, b=true, out[0..2]=address);
+    // 1xx = 0; 01x=in[t], 001 = out[t]+1, 000=out[t];
+    Mux8Way16(a=outt1, b=outt2, c=in, d=in, e=false, f=false, g=false, h=false, sel=address, out=outt);
 }
