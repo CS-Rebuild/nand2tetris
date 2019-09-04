@@ -28,4 +28,40 @@ CHIP Memory {
 
     PARTS:
     // Put your code here:
+
+    // Check Addr
+    // if addr[13..14] == 0b11 and addr[0..12] has 1 then invalid address
+    Or8Way(in=address[0..7], out=or0to7); 
+    Or8Way(in[0..4]=address[8..12], in[5..7]=false, out=or8to12);
+    Or(a=or0to7, b=or8to12, out=or0to12);
+    And(a=address[13], b=address[14], out=and13to14);
+    And(a=and13to14, b=or0to12, out=and13to14Andor0to12);
+    Not(in=and13to14Andor0to12, out=validAddr);
+
+    // RAM Load
+    // (addr[14] = 0) && valid addr && load
+    Not(in=address[14], out=notAddr14); //addr[14] = 0
+    And(a=notAddr14, b=validAddr, out=ramAddr);
+    And(a=load, b=ramAddr, out=ramLoad);
+
+    // Screen Load
+    // (addr[13] = 0) && (addr[14] = 1) && valid addr && load
+    Not(in=address[13], out=notAddr13); 
+    And(a=address[14], b=notAddr13, out=addr14AndnotAddr13);
+    And(a=addr14AndnotAddr13, b=validAddr, out=screenAddr);
+    And(a=load, b=screenAddr, out=screenLoad);
+
+    // if address in 0-‭b0100 0000 0000 0000‬-1 = 0-011 1111 1111 1111 = 0xx
+    RAM16K(in=in ,load=ramLoad, address=address[0..13], out=outRAM); 
+    // else if address in 0100000000000000‬-0110000000000000‬-1 = 100 0000 0000 0000 - 101 1111 1111 1111 = 10x
+    Screen(in=in ,load=screenLoad, address=address[0..12], out=outScreen); 
+    // ‭else if address is 0110000000000000‬ = 110 and 0000 0000 0000; 
+    Keyboard(out=outKey); 
+    // else invalid
+
+    // address[13..14] as sel RAM(0x), Screen(10), Key(11)
+    Mux4Way16(a=outRAM, b=outRAM, c=outScreen, d=outKey, sel=address[13..14], out=outValid);
+
+    // filter invalid address space
+    Mux16(a=false, b=outValid, sel=validAddr, out=out); 
 }

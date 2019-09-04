@@ -40,4 +40,105 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+    // first Mux16
+    Mux16(a=instruction, b=outMTemp, sel=instruction[15], out=regAInput);
+
+    Mux16(a=false, b=instruction, sel=instruction[15], out=decodeInput);
+
+    // Decodes the C-Instruction
+    // 1 1 1 a c1 c2 c3 c4 c5 c6 d1 d2 d3 j1 j2 j3 
+    And16(a=decodeInput, b=true, out[15]=CInstructionBit, 
+        out[12]=a, out[11]=c1, out[10]=c2, out[9]=c3, out[8]=c4, out[7]=c5, out[6]=c6, 
+        out[5]=d1, out[4]=d2, out[3]=d3, 
+        out[2]=j1, out[1]=j2, out[0]=j3);
+    
+    // A Register load
+    Mux(a=true, b=d1, sel=instruction[15], out=loadA);
+    ARegister(in=regAInput, load=loadA, out=regAOutput);
+
+    // D Register load
+    // Mux(a=true, b=d2, sel=instruction[15], out=loadD);
+    DRegister(in=outMTemp, load=d2, out=regDOutput);
+
+    // OUT: writeM
+    And(a=d3, b=true, out=writeM);
+
+    // Second Mux16
+    Mux16(a=regAOutput, b=inM, sel=a, out=mux16Output);
+
+    // ALU
+    ALU(x=regDOutput, y=mux16Output, zx=c1, nx=c2, zy=c3, ny=c4, f=c5, no=c6, out=outMTemp, zr=cZr, ng=cNg);
+    
+    // OUT: outM
+    And16(a=true, b=outMTemp, out=outM);
+
+    // OUT: addressM
+    And16(a=true, b=regAOutput, out[15]=addrMDummy, out[0..14]=addressM);
+
+    // PC control bits
+    Or(a=j1, b=j2, out=j1Orj2);
+    Or(a=j1Orj2, b=j3, out=cPCInc1);
+    Not(in=cPCLoad, out=cPCInc2);
+    Or(a=cPCInc1, b=cPCInc2, out=cPCInc);
+
+    Not(in=j1, out=notj1);
+    Not(in=j2, out=notj2);
+    Not(in=j3, out=notj3);
+    Not(in=cZr, out=notcZr);
+    Not(in=cNg, out=notcNg);
+
+    // J1 J2 J3 Zr Ng
+    // 0  0  0  x  x    Inc
+    // 0  0  1  0  0    >0
+    // 0  1  0  1  0    =0
+    // 0  1  1  x  0    >=0
+    // 1  0  0  0  1    <0
+    // 1  0  1  0  x    !=0
+    // 1  1  0  x  1    <=0
+    // 1  1  1  x  x    JMP
+    
+    //JGT >0
+    And(a=notj1, b=notj2, out=cJGT1);
+    And(a=cJGT1, b=j3, out=cJGT2);
+    And(a=cJGT2, b=notcZr, out=cJGT3);
+    And(a=cJGT3, b=notcNg, out=cJGT);
+
+    //JEQ =0
+    And(a=notj1, b=j2, out=cJEQ1);
+    And(a=cJEQ1, b=notj3, out=cJEQ2);
+    And(a=cJEQ2, b=cZr, out=cJEQ3);
+    And(a=cJEQ3, b=notcNg, out=cJEQ);
+
+    //JGE >=0
+    And(a=notj1, b=j2, out=cJGE1);
+    And(a=cJGE1, b=j3, out=cJGE2);
+    And(a=cJGE2, b=notcNg, out=cJGE);
+    
+    //JLT <0
+    And(a=j1, b=notj2, out=cJLT1);
+    And(a=cJLT1, b=notj3, out=cJLT2);
+    And(a=cJLT2, b=notcZr, out=cJLT3);
+    And(a=cJLT3, b=cNg, out=cJLT);
+
+    //JNE !=0
+    And(a=j1, b=notj2, out=cJNE1);
+    And(a=cJNE1, b=j3, out=cJNE2);
+    And(a=cJNE2, b=notcZr, out=cJNE);
+
+    //JLE <=0
+    And(a=j1, b=j2, out=cJLE1);
+    And(a=cJLE1, b=notj3, out=cJLE2);
+    And(a=cJLE2, b=cNg, out=cJLEa);
+
+    And(a=cJLE2, b=cZr, out=cJLE3);
+    And(a=cJLE3, b=notcNg, out=cJLEb);
+    
+    Or(a=cJLEa, b=cJLEb, out=cJLE);
+    //JMP
+    And(a=j1, b=j2, out=cJMP1);
+    And(a=cJMP1, b=j3, out=cJMP);
+
+    Or8Way(in[7]=false, in[6]=cJGT, in[5]=cJEQ, in[4]=cJGE, in[3]=cJLT, in[2]=cJNE, in[1]=cJLE, in[0]=cJMP, out=cPCLoad);
+    // OUT: pc
+    PC(in=regAOutput, load=cPCLoad, inc=cPCInc, reset=reset, out[15]=pcDummy, out[0..14]=pc);
 }
